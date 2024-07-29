@@ -61,13 +61,21 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
+    
+    - name: Install jq
+      run: sudo apt-get install -y jq
+
+    - name: Update task-definition.json with the image URI
+      run: |
+        jq --arg image_uri "${{ env.IMAGE_URI }}" \
+           '.containerDefinitions[0].image = $image_uri' \
+           task-definition.json > updated-task-definition.json
+        mv updated-task-definition.json task-definition.json
+    
     - name: Register ECS Task Definition
       run: |
-        echo "+++++++++++ Update task-definition.json with the image URI"
-        sed -i "s#<IMAGE_URI>#${{ env.IMAGE_URI }}#g" task-definition.json
         cat task-definition.json
-        echo "+++++++++++"
-
+        
         # Register the updated task definition
         aws ecs register-task-definition \
           --cli-input-json file://task-definition.json \
