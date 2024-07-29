@@ -63,8 +63,10 @@ jobs:
 
     - name: Register ECS Task Definition
       run: |
-        # Update task-definition.json with the image URI
+        echo "+++++++++++ Update task-definition.json with the image URI"
         sed -i "s#<IMAGE_URI>#${{ env.IMAGE_URI }}#g" task-definition.json
+        cat task-definition.json
+        echo "+++++++++++"
 
         # Register the updated task definition
         aws ecs register-task-definition \
