@@ -13,12 +13,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           java-version: "11"
           distribution: "temurin"
           cache: maven
+
       - name: Build with Maven
         run: |
           mvn -B package --file pom.xml
@@ -30,11 +32,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-        
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
-        
+
       - name: Build, tag, and push Docker image
         env:
           ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
@@ -46,14 +48,14 @@ jobs:
 
           # Output image URI
           echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-  
-  
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -61,9 +63,11 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    
     - name: Install jq
       run: sudo apt-get install -y jq
+
+    - name: Print IMAGE_URI
+      run: echo "IMAGE_URI=${{ env.IMAGE_URI }}"
 
     - name: Update task-definition.json with the image URI
       run: |
@@ -71,7 +75,7 @@ jobs:
            '.containerDefinitions[0].image = $image_uri' \
            task-definition.json > updated-task-definition.json
         mv updated-task-definition.json task-definition.json
-    
+
     - name: Register ECS Task Definition
       run: |
         cat task-definition.json
@@ -80,32 +84,27 @@ jobs:
         aws ecs register-task-definition \
           --cli-input-json file://task-definition.json \
           --region ${{ secrets.AWS_REGION }}
-      
+
     - name: Create or Update ECS Service
       run: |
         # Check if the service exists
-        SERVICE_EXISTS=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --region $AWS_REGION --query 'services[0].serviceName' --output text || true)
+        SERVICE_EXISTS=$(aws ecs describe-services --cluster ${{ secrets.ECS_CLUSTER_NAME }} --services ${{ secrets.ECS_SERVICE_NAME }} --region ${{ secrets.AWS_REGION }} --query 'services[0].serviceName' --output text || true)
         
-        if [ "$SERVICE_EXISTS" == "$SERVICE_NAME" ]; then
+        if [ "$SERVICE_EXISTS" == "${{ secrets.ECS_SERVICE_NAME }}" ]; then
           echo "Service exists, updating..."
           aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
+            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
+            --service ${{ secrets.ECS_SERVICE_NAME }} \
             --force-new-deployment \
-            --region $AWS_REGION \
+            --region ${{ secrets.AWS_REGION }} \
             --output json
         else
           echo "Service does not exist, creating..."
           aws ecs create-service \
-            --cluster $CLUSTER_NAME \
-            --service-name $SERVICE_NAME \
-            --task-definition $TASK_DEFINITION \
+            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
+            --service-name ${{ secrets.ECS_SERVICE_NAME }} \
+            --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
             --desired-count 1 \
-            --region $AWS_REGION \
+            --region ${{ secrets.AWS_REGION }} \
             --output json
         fi
-      env:
-        CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
-        SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME }}
-        TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
