@@ -5,7 +5,9 @@ FROM openjdk:11-jre-slim
 WORKDIR /app
 
 # Copy the application JAR file into the container at /app
-COPY target/*.jar app.jar
+# fix the target content later
+COPY target/MailReader-0.0.1-SNAPSHOT.jar app.jar
+
 
 # Make port 8080 available to the world outside this container
 EXPOSE 8080
