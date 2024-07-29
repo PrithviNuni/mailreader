@@ -4,7 +4,7 @@
   "containerDefinitions": [
     {
       "name": "mailreader",
-      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/<REPOSITORY>:<TAG>",
+      "image": "<IMAGE_URI>",
       "essential": true,
       "memory": 512,
       "cpu": 256,
@@ -16,7 +16,7 @@
       ],
       "environment": [
         {
-          "name": JAVA_OPTIONS",
+          "name": "JAVA_OPTIONS",
           "value": ""
         }
       ]
