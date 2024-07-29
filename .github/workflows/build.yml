@@ -43,26 +43,58 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+          # Output image URI
+          echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
+  
   
   deploy:
-      needs: build
-      runs-on: ubuntu-latest
-  
-      steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-  
-      - name: Set up AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-  
-      - name: Update ECS service
-        env:
-          CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
-          SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME }}
-          IMAGE_URI: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
-        run: |
-          aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --force-new-deployment --region ${{ secrets.AWS_REGION }} --output json
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Register ECS Task Definition
+      run: |
+        # Update task-definition.json with the image URI
+        sed -i "s#<IMAGE_URI>#${{ env.IMAGE_URI }}#g" task-definition.json
+
+        # Register the updated task definition
+        aws ecs register-task-definition \
+          --cli-input-json file://task-definition.json \
+          --region ${{ secrets.AWS_REGION }}
+      
+    - name: Create or Update ECS Service
+      run: |
+        # Check if the service exists
+        SERVICE_EXISTS=$(aws ecs describe-services --cluster $CLUSTER_NAME --services $SERVICE_NAME --region $AWS_REGION --query 'services[0].serviceName' --output text || true)
+        
+        if [ "$SERVICE_EXISTS" == "$SERVICE_NAME" ]; then
+          echo "Service exists, updating..."
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --region $AWS_REGION \
+            --output json
+        else
+          echo "Service does not exist, creating..."
+          aws ecs create-service \
+            --cluster $CLUSTER_NAME \
+            --service-name $SERVICE_NAME \
+            --task-definition $TASK_DEFINITION \
+            --desired-count 1 \
+            --region $AWS_REGION \
+            --output json
+        fi
+      env:
+        CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
+        SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME }}
+        TASK_DEFINITION: ${{ secrets.ECS_TASK_DEFINITION }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
