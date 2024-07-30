@@ -1,10 +1,10 @@
 {
   "family": "mailreader-definition",
-  "networkMode": "bridge",
+  "networkMode": "awsvpc",
   "containerDefinitions": [
     {
-      "name": "mailreader",
-      "image": "<IMAGE_URI>",
+      "name": "mailreader-container",
+      "image": "<IMAGE_URI>",  // Placeholder for the Docker image URI
       "essential": true,
       "memory": 512,
       "cpu": 256,
@@ -16,18 +16,21 @@
       ],
       "environment": [
         {
-          "name": "JAVA_OPTIONS",
-          "value": ""
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "prod"
         }
       ]
     }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
   ],
   "cpu": "256",
   "memory": "512",
   "tags": [
     {
       "key": "Name",
-      "value": "mailreader-definition"
+      "value": "mailreader-task"
     }
   ]
 }
