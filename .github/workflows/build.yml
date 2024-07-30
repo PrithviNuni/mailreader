@@ -75,8 +75,13 @@ jobs:
       - name: Create or Update ECS Service
         run: |
           # Check if the service exists
-          SERVICE_EXISTS=$(aws ecs describe-services --cluster ${{ secrets.ECS_CLUSTER_NAME }} --services ${{ secrets.ECS_SERVICE_NAME }} --region ${{ secrets.AWS_REGION }} --query 'services[0].serviceName' --output text || true)
-          
+          SERVICE_EXISTS=$(aws ecs describe-services \
+            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
+            --services ${{ secrets.ECS_SERVICE_NAME }} \
+            --region ${{ secrets.AWS_REGION }} \
+            --query 'services[0].serviceName' \
+            --output text || true)
+
           if [ "$SERVICE_EXISTS" == "${{ secrets.ECS_SERVICE_NAME }}" ]; then
             echo "Service exists, updating..."
             aws ecs update-service \
