@@ -84,7 +84,7 @@ jobs:
             aws ecs update-service \
               --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
               --service ${{ secrets.ECS_SERVICE_NAME }} \
-              --task-definition ${{ env.TASK_DEFINITION_ARN }} \
+              --task-definition task-definition.json \
               --force-new-deployment \
               --region ${{ secrets.AWS_REGION }} \
               --output json
@@ -93,7 +93,7 @@ jobs:
             aws ecs create-service \
               --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
               --service-name ${{ secrets.ECS_SERVICE_NAME }} \
-              --task-definition ${{ env.TASK_DEFINITION_ARN }} \
+              --task-definition task-definition.json \
               --desired-count 1 \
               --region ${{ secrets.AWS_REGION }} \
               --output json
