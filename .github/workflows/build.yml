@@ -95,7 +95,7 @@ jobs:
             aws ecs create-service \
               --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
               --service-name ${{ secrets.ECS_SERVICE_NAME }} \
-              --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
+              --task-definition task-definition.json \
               --desired-count 1 \
               --region ${{ secrets.AWS_REGION }} \
               --output json
