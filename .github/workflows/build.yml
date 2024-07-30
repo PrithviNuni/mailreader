@@ -6,11 +6,13 @@ on:
     branches:
       - mailreader
       - test1
+
 env:
   CONTAINER_NAME: mailreader
   ECS_TASK_DEFINITION: ./task-definition.json
   ECS_SERVICE: mailreader                # set this to your Amazon ECS service name
   ECS_CLUSTER: mailreader
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -30,6 +32,7 @@ jobs:
         run: |
           mvn -B package --file pom.xml
           ls -altrh target/*
+      
       - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -51,16 +54,19 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           # Set IMAGE_URI for use later in the same job
           echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
+      
       - name: Print IMAGE_URI
         run: echo "IMAGE_URI=${{ env.IMAGE_URI }}"
 
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Update task-definition.json with the image URI
+      - name: Update task-definition.json with the image URI and role ARNs
         run: |
           jq --arg image_uri "${{ env.IMAGE_URI }}" \
-             '.containerDefinitions[0].image = $image_uri' \
+             --arg execution_role_arn "${{ secrets.ECS_EXECUTION_ROLE_ARN }}" \
+             --arg task_role_arn "${{ secrets.ECS_TASK_ROLE_ARN }}" \
+             '.containerDefinitions[0].image = $image_uri | .executionRoleArn = $execution_role_arn | .taskRoleArn = $task_role_arn' \
              task-definition.json > updated-task-definition.json
           mv updated-task-definition.json task-definition.json
       
