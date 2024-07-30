@@ -1,5 +1,5 @@
 {
-  "family": "mailreader-definition",
+  "family": "mailreader-task",
   "networkMode": "awsvpc",
   "containerDefinitions": [
     {
@@ -10,14 +10,9 @@
       "cpu": 256,
       "portMappings": [
         {
-          "containerPort": 8080,
-          "hostPort": 8080
-        }
-      ],
-      "environment": [
-        {
-          "name": "SPRING_PROFILES_ACTIVE",
-          "value": "prod"
+          "containerPort": 80,
+          "hostPort": 80,
+          "protocol": "tcp"
         }
       ]
     }
@@ -27,10 +22,6 @@
   ],
   "cpu": "256",
   "memory": "512",
-  "tags": [
-    {
-      "key": "Name",
-      "value": "mailreader-task"
-    }
-  ]
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/YOUR_EXECUTION_ROLE_NAME",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/YOUR_TASK_ROLE_NAME"
 }
