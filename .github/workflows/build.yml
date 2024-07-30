@@ -1,4 +1,4 @@
-name: Build and Deploy to ECS
+name: Build and Deploy to ECS Fargate
 
 on:
   workflow_dispatch:
@@ -46,12 +46,7 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-          # Set IMAGE_URI for use later in the same job
           echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
-
-      - name: Print IMAGE_URI
-        run: echo "IMAGE_URI=${{ env.IMAGE_URI }}"
 
       - name: Install jq
         run: sudo apt-get install -y jq
@@ -70,14 +65,11 @@ jobs:
             --cli-input-json file://task-definition.json \
             --region ${{ secrets.AWS_REGION }})
           echo "Register Response: $RESPONSE"
-          
-          # Extract the task definition ARN
           TASK_DEFINITION_ARN=$(echo $RESPONSE | jq -r '.taskDefinition.taskDefinitionArn')
           echo "TASK_DEFINITION_ARN=$TASK_DEFINITION_ARN" >> $GITHUB_ENV
 
       - name: Create or Update ECS Service
         run: |
-          # Check if the service exists
           SERVICE_EXISTS=$(aws ecs describe-services \
             --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
             --services ${{ secrets.ECS_SERVICE_NAME }} \
@@ -98,10 +90,6 @@ jobs:
               --output json
           else
             echo "Service does not exist, creating..."
-            
-            # Ensure TASK_DEFINITION_ARN is correctly set
-            echo "Using Task Definition ARN: ${{ env.TASK_DEFINITION_ARN }}"
-
             aws ecs create-service \
               --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
               --service-name ${{ secrets.ECS_SERVICE_NAME }} \
