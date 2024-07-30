@@ -8,7 +8,7 @@ on:
       - test1
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -47,69 +47,51 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-          # Output image URI for the deploy job
+          # Set IMAGE_URI for use later in the same job
           echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
+      - name: Print IMAGE_URI
+        run: echo "IMAGE_URI=${{ env.IMAGE_URI }}"
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get install -y jq
 
-    - name: Set up AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Update task-definition.json with the image URI
+        run: |
+          jq --arg image_uri "${{ env.IMAGE_URI }}" \
+             '.containerDefinitions[0].image = $image_uri' \
+             task-definition.json > updated-task-definition.json
+          mv updated-task-definition.json task-definition.json
 
-    - name: Print all environment variables
-      run: env
+      - name: Register ECS Task Definition
+        run: |
+          cat task-definition.json
+          
+          # Register the updated task definition
+          aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --region ${{ secrets.AWS_REGION }}
 
-    - name: Print IMAGE_URI
-      run: echo "IMAGE_URI=${{ env.IMAGE_URI }}"
-
-    - name: Install jq
-      run: sudo apt-get install -y jq
-
-    - name: Update task-definition.json with the image URI
-      run: |
-        jq --arg image_uri "${{ env.IMAGE_URI }}" \
-           '.containerDefinitions[0].image = $image_uri' \
-           task-definition.json > updated-task-definition.json
-        mv updated-task-definition.json task-definition.json
-
-    - name: Register ECS Task Definition
-      run: |
-        cat task-definition.json
-        
-        # Register the updated task definition
-        aws ecs register-task-definition \
-          --cli-input-json file://task-definition.json \
-          --region ${{ secrets.AWS_REGION }}
-
-    - name: Create or Update ECS Service
-      run: |
-        # Check if the service exists
-        SERVICE_EXISTS=$(aws ecs describe-services --cluster ${{ secrets.ECS_CLUSTER_NAME }} --services ${{ secrets.ECS_SERVICE_NAME }} --region ${{ secrets.AWS_REGION }} --query 'services[0].serviceName' --output text || true)
-        
-        if [ "$SERVICE_EXISTS" == "${{ secrets.ECS_SERVICE_NAME }}" ]; then
-          echo "Service exists, updating..."
-          aws ecs update-service \
-            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
-            --service ${{ secrets.ECS_SERVICE_NAME }} \
-            --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }} \
-            --output json
-        else
-          echo "Service does not exist, creating..."
-          aws ecs create-service \
-            --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
-            --service-name ${{ secrets.ECS_SERVICE_NAME }} \
-            --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
-            --desired-count 1 \
-            --region ${{ secrets.AWS_REGION }} \
-            --output json
-        fi
+      - name: Create or Update ECS Service
+        run: |
+          # Check if the service exists
+          SERVICE_EXISTS=$(aws ecs describe-services --cluster ${{ secrets.ECS_CLUSTER_NAME }} --services ${{ secrets.ECS_SERVICE_NAME }} --region ${{ secrets.AWS_REGION }} --query 'services[0].serviceName' --output text || true)
+          
+          if [ "$SERVICE_EXISTS" == "${{ secrets.ECS_SERVICE_NAME }}" ]; then
+            echo "Service exists, updating..."
+            aws ecs update-service \
+              --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
+              --service ${{ secrets.ECS_SERVICE_NAME }} \
+              --force-new-deployment \
+              --region ${{ secrets.AWS_REGION }} \
+              --output json
+          else
+            echo "Service does not exist, creating..."
+            aws ecs create-service \
+              --cluster ${{ secrets.ECS_CLUSTER_NAME }} \
+              --service-name ${{ secrets.ECS_SERVICE_NAME }} \
+              --task-definition ${{ secrets.ECS_TASK_DEFINITION }} \
+              --desired-count 1 \
+              --region ${{ secrets.AWS_REGION }} \
+              --output json
+          fi
