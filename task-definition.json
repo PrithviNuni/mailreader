@@ -3,7 +3,7 @@
   "networkMode": "awsvpc",
   "containerDefinitions": [
     {
-      "name": "mailreader-container",
+      "name": "mailreader",
       "image": "<IMAGE_URI>",
       "essential": true,
       "memory": 512,
